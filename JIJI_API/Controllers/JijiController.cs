@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using JIJI_API.Data;
 using JIJI_API.Models;
+using JIJI_API.Service.Interface;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,10 +16,12 @@ namespace JIJI_API.Controllers
     public class JijiController : ControllerBase
     {
         private readonly JijiDbContext _context;
+        private readonly IProductsService _productsService;
 
-        public JijiController(JijiDbContext context)
+        public JijiController(JijiDbContext context, IProductsService productsService)
         {
             _context = context;
+            _productsService = productsService;
         }
 
         [HttpGet("allProducts")]
@@ -36,39 +39,10 @@ namespace JIJI_API.Controllers
         }
 
         [HttpGet("products")]
-        public IActionResult GetProducts([FromQuery] int? categoryId, [FromQuery] int? regionId, [FromQuery] decimal? minPrice, [FromQuery] decimal? maxPrice)
+        public async Task<IActionResult> GetProducts([FromQuery] int? categoryId, [FromQuery] int? regionId, [FromQuery] decimal? minPrice, [FromQuery] decimal? maxPrice)
         {
-            try
-            {
-                var query = _context.Products.AsQueryable();
-
-                if (categoryId.HasValue)
-                {
-                    query = query.Where(p => p.category_id == categoryId.Value);
-                }
-
-                if (regionId.HasValue)
-                {
-                    query = query.Where(p => p.region_id == regionId.Value);
-                }
-
-                if (minPrice.HasValue)
-                {
-                    query = query.Where(p => p.price >= minPrice.Value);
-                }
-
-                if (maxPrice.HasValue)
-                {
-                    query = query.Where(p => p.price <= maxPrice.Value);
-                }
-
-                var products = query.ToList();
-                return Ok(products);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"An error occurred while retrieving products: {ex.Message}");
-            }
+            var yeti = await _productsService.GetProducts(categoryId, regionId, minPrice, maxPrice);
+            return StatusCode(int.Parse(yeti.Code), yeti);
         }
 
         [HttpGet("products/{id}")]
@@ -106,6 +80,80 @@ namespace JIJI_API.Controllers
         }
 
         // Implement other endpoints here...
+        [HttpGet("cart")]
+        public async Task<IActionResult> GetCart()
+        {
+            var yeti = await _productsService.GetCart();
+            return StatusCode(int.Parse(yeti.Code), yeti);
+        }
+
+       
+
+        // Update the quantity of a product in the cart
+        [HttpPut("cart/{id}")]
+        public IActionResult UpdateCartItem(int id, [FromBody] int quantity)
+        {
+            try
+            {
+                var cartItem = _context.Cart.Find(id);
+                if (cartItem == null)
+                {
+                    return NotFound("Cart item not found");
+                }
+
+                cartItem.quantity = quantity;
+                _context.SaveChanges();
+                return Ok("Cart item updated successfully");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while updating cart item: {ex.Message}");
+            }
+        }
+
+        // Remove a product from the cart
+        [HttpDelete("cart/{id}")]
+        public IActionResult RemoveFromCart(int id)
+        {
+            try
+            {
+                var cartItem = _context.Cart.Find(id);
+                if (cartItem == null)
+                {
+                    return NotFound("Cart item not found");
+                }
+
+                _context.Cart.Remove(cartItem);
+                _context.SaveChanges();
+                return Ok("Cart item removed successfully");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while removing cart item: {ex.Message}");
+            }
+        }
+
+        // Check the stock quantity of a specific product
+        [HttpGet("stock/{id}")]
+        public IActionResult GetStock(int id)
+        {
+            try
+            {
+                var product = _context.Products.Find(id);
+                if (product == null)
+                {
+                    return NotFound("Product not found");
+                }
+
+                return Ok(new { product.id, product.stock_quantity });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while checking stock quantity: {ex.Message}");
+            }
+        }
+
+
 
     }
 

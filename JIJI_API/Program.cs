@@ -1,15 +1,39 @@
 using JIJI_API.Data;
+using JIJI_API.Service.Interface;
+using JIJI_API.Service.Provider;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddDbContext<JijiDbContext>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("DbConnection")));
+builder.Services.AddScoped<IProductsService, ProductsPgDbService>();
+
+
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("NextApp", policyBuider =>
+    {
+        policyBuider.WithOrigins("http://localhost:3000");
+        policyBuider.AllowAnyHeader();
+        policyBuider.AllowAnyMethod();
+        policyBuider.AllowCredentials();
+
+    });
+    options.AddPolicy("BlazorApp", policyBuider =>
+    {
+        policyBuider.WithOrigins("http://localhost:3000");
+        policyBuider.AllowAnyHeader();
+        policyBuider.AllowAnyMethod();
+        policyBuider.AllowCredentials();
+
+    });
+});
 
 var app = builder.Build();
 
@@ -20,10 +44,14 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
+
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.UseCors("NextApp");
 
 app.Run();
